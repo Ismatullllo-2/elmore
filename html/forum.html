@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Форум</h2>
+<a href="{{ url_for('create_post') }}">Создать новый пост</a>
+<ul>
+    {% for post in posts %}
+        <li>
+            <h3>{{ post.title }}</h3>
+            <p>{{ post.content }}</p>
+            <p>Автор: {{ post.author.username }}</p>
+        </li>
+    {% endfor %}
+</ul>
+{% endblock %}
