@@ -1,29 +1,24 @@
 from flask import Flask, render_template, redirect, url_for, request, flash
-from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
-db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-class User(db.Model, UserMixin):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(150), unique=True, nullable=False)
-    password = db.Column(db.String(150), nullable=False)
-    posts = db.relationship('Post', backref='author', lazy=True)
+# Dummy user data for demonstration purposes
+users = {}
+posts = []
 
-class Post(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(150), nullable=False)
-    content = db.Column(db.Text, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+class User(UserMixin):
+    def __init__(self, id, username, password):
+        self.id = id
+        self.username = username
+        self.password = password
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return users.get(int(user_id))
 
 @app.route('/')
 def home():
@@ -34,9 +29,9 @@ def register():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        new_user = User(username=username, password=password)
-        db.session.add(new_user)
-        db.session.commit()
+        user_id = len(users) + 1  # Simple ID assignment
+        new_user = User(user_id, username, password)
+        users[user_id] = new_user
         flash('Регистрация прошла успешно!', 'success')
         return redirect(url_for('login'))
     return render_template('register.html')
@@ -46,7 +41,7 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        user = User.query.filter_by(username=username, password=password).first()
+        user = next((u for u in users.values() if u.username == username and u.password == password), None)
         if user:
             login_user(user)
             return redirect(url_for('forum'))
@@ -57,7 +52,6 @@ def login():
 @app.route('/forum', methods=['GET', 'POST'])
 @login_required
 def forum():
-    posts = Post.query.all()
     return render_template('forum.html', posts=posts)
 
 @app.route('/create_post', methods=['GET', 'POST'])
@@ -66,9 +60,8 @@ def create_post():
     if request.method == 'POST':
         title = request.form['title']
         content = request.form['content']
-        new_post = Post(title=title, content=content, user_id=current_user.id)
-        db.session.add(new_post)
-        db.session.commit()
+        new_post = {'title': title, 'content': content, 'author': current_user.username}
+        posts.append(new_post)
         flash('Пост успешно создан!', 'success')
         return redirect(url_for('forum'))
     return render_template('create_post.html')
@@ -85,5 +78,5 @@ def logout():
     return redirect(url_for('home'))
 
 if __name__ == '__main__':
-    db.create_all()  # Создает базу данных и таблицы
     app.run(debug=True)
+
